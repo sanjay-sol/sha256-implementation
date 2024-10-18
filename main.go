@@ -64,6 +64,20 @@ func to64Bit(size int) []int {
 	return bits
 }
 
+func rotr(x uint32, n uint) uint32 {
+	return (x >> n) | (x << (32 - n))
+}
+
+// !Sigma0 function --> 32 bit
+func sigma0(x uint32) uint32 {
+	return rotr(x, 7) ^ rotr(x, 18) ^ (x >> 3)
+}
+
+//! Sigma1 function -- > 32 bit
+func sigma1(x uint32) uint32 {
+	return rotr(x, 17) ^ rotr(x, 19) ^ (x >> 10)
+}
+
 func main() {
 	x := []byte("Hello saldifou oiasfoiasdhf")
 	bitsX := bits(x)
