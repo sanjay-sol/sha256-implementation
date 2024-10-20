@@ -17,20 +17,48 @@ func bits(b []byte) []int {
 	return result
 }
 
-func hexToBits(hexString string) ([]int, error) {
-	bytes, err := hex.DecodeString(hexString)
-	if err != nil {
-		return nil, err
-	}
+// func hexToBits(hexString string) ([]int, error) {
+// 	bytes, err := hex.DecodeString(hexString)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	var bits []int
-	for _, b := range bytes {
-		for i := 7; i >= 0; i-- {
-			bits = append(bits, int((b>>i)&1))
+// 	var bits []int
+// 	for _, b := range bytes {
+// 		for i := 7; i >= 0; i-- {
+// 			bits = append(bits, int((b>>i)&1))
+// 		}
+// 	}
+
+// 	return bits, nil
+// }
+func hexToBits(hexString string) ([]int, error) {
+    if len(hexString)%2 != 0 {
+		// fmt.Println("True", len(hexString), hexString)
+        hexString = "0" + hexString
+    }
+
+    bytes, err := hex.DecodeString(hexString)
+    if err != nil {
+        return nil, err
+    }
+
+    var bits []int
+    for _, b := range bytes {
+        for i := 7; i >= 0; i-- {
+            bits = append(bits, int((b>>i)&1))
+        }
+    }
+	// fmt.Println("Bits:", bits, len(bits))
+
+	if len(bits) < 32 {
+		numberOfZeros := 32 - len(bits)
+		for i := 0; i < numberOfZeros; i++ {
+			bits = append([]int{0}, bits...)
 		}
 	}
 
-	return bits, nil
+    return bits, nil
 }
 
 func roundUpToNearestMultipleOf512(n int) int {
@@ -50,9 +78,7 @@ func padding(bits []int, totalLength int) []int {
 }
 
 func to64Bit(size int) []int {
-	// Create a byte slice of 8 bytes
 	sizeBytes := make([]byte, 8)
-	// Convert the size to uint64 and store it in big-endian format
 	binary.BigEndian.PutUint64(sizeBytes, uint64(size))
 
 	var bits []int
@@ -73,13 +99,41 @@ func sigma0(x uint32) uint32 {
 	return rotr(x, 7) ^ rotr(x, 18) ^ (x >> 3)
 }
 
-//! Sigma1 function -- > 32 bit
+// ! Sigma1 function -- > 32 bit
 func sigma1(x uint32) uint32 {
 	return rotr(x, 17) ^ rotr(x, 19) ^ (x >> 10)
 }
 
+func bitsToBytes(bits []int) []byte {
+	bytes := make([]byte, len(bits)/8)
+	for i := 0; i < len(bits); i += 8 {
+		for j := 0; j < 8; j++ {
+			bytes[i/8] = bytes[i/8]<<1 + byte(bits[i+j])
+		}
+	}
+	return bytes
+}
+
+//! Divide the padded message into 512-bit blocks and split into 32-bit words
+func divideIntoBlocks(paddedMessage []int) [][]uint32 {
+	var blocks [][]uint32
+	bytes := bitsToBytes(paddedMessage)
+	blockCount := len(bytes) / 64 // 512 bits = 64 bytes per block
+
+	for i := 0; i < blockCount; i++ {
+		var block []uint32
+		for j := 0; j < 16; j++ {
+			word := binary.BigEndian.Uint32(bytes[i*64+j*4 : i*64+j*4+4])
+			block = append(block, word)
+		}
+		blocks = append(blocks, block)
+	}
+
+	return blocks
+}
+
 func main() {
-	x := []byte("Hello saldifou oiasfoiasdhf")
+	x := []byte("Hello saldifou oiasfoiasdhf kajsdhf asoiflhoo234 aslhd akjhsd alkhklf akwlh 'asl;l sdasd sdgees;dfs dfdsf")
 	bitsX := bits(x)
 	numberOfBits := len(bitsX)
 	nextMultipleOf512 := roundUpToNearestMultipleOf512(numberOfBits + 65)
@@ -90,6 +144,20 @@ func main() {
 	fmt.Println("Merged Array:", mergedArray)
 	fmt.Println("Merged Array:", len(mergedArray))
 
+	blocks := divideIntoBlocks(mergedArray)
+
+	for i, block := range blocks {
+		fmt.Printf("Block %d:\n", i)
+		for j, word := range block {
+			bits, err := hexToBits(fmt.Sprintf("%x", word))
+			if err != nil {
+				fmt.Println("Error:", err)
+				return
+			}
+			fmt.Printf("  Word %d: %v\n  ", j, bits)
+		}
+	}
+
 	hexString := "6a09e667"
 
 	bits, err := hexToBits(hexString)
@@ -97,6 +165,10 @@ func main() {
 		fmt.Println("Error:", err)
 		return
 	}
+
+	numberOfBlocks := len(mergedArray) / 512
+
+	fmt.Println("Number of Blocks:", numberOfBlocks)
 
 	var HConstants = []int{
 		0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
