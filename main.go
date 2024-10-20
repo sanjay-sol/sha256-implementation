@@ -5,9 +5,9 @@ import (
 	"fmt"
 )
 
-//*   ==========================
-//*       Utility Functions
-//*   ==========================
+//* ==========================
+//*     Utility Functions
+//* ==========================
 
 // ? Convert bytes into bits
 func bits(b []byte) []int {
@@ -49,9 +49,9 @@ func bitsToBytes(bits []int) []byte {
 	return bytes
 }
 
-//*		===============================
-//* 	  Padding and Block Handling
-//* 	==============================
+//* ===============================
+//* 	Padding and Block Handling
+//* ==============================
 
 // ? Pad the bit array according to the SHA-256 specification
 func padding(bits []int, totalLength int) []int {
@@ -84,9 +84,9 @@ func divideIntoBlocks(paddedMessage []int) [][]uint32 {
 	return blocks
 }
 
-//* 		==========================
-//* 			 SHA-256 Functions
-//* 		==========================
+//* ==========================
+//*  SHA-256 Functions
+//* ==========================
 
 // ? SHA-256 auxiliary functions
 func rotr(x uint32, n uint) uint32 {
