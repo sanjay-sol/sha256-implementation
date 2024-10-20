@@ -2,11 +2,14 @@ package main
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 )
 
-// Convert bytes into bits
+//*   ==========================
+//*       Utility Functions
+//*   ==========================
+
+// ? Convert bytes into bits
 func bits(b []byte) []int {
 	var result []int
 	for i := 0; i < len(b); i++ {
@@ -17,66 +20,11 @@ func bits(b []byte) []int {
 	return result
 }
 
-// func hexToBits(hexString string) ([]int, error) {
-// 	bytes, err := hex.DecodeString(hexString)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var bits []int
-// 	for _, b := range bytes {
-// 		for i := 7; i >= 0; i-- {
-// 			bits = append(bits, int((b>>i)&1))
-// 		}
-// 	}
-
-//		return bits, nil
-//	}
-func hexToBits(hexString string) ([]int, error) {
-	if len(hexString)%2 != 0 {
-		// fmt.Println("True", len(hexString), hexString)
-		hexString = "0" + hexString
-	}
-
-	bytes, err := hex.DecodeString(hexString)
-	if err != nil {
-		return nil, err
-	}
-
-	var bits []int
-	for _, b := range bytes {
-		for i := 7; i >= 0; i-- {
-			bits = append(bits, int((b>>i)&1))
-		}
-	}
-	// fmt.Println("Bits:", bits, len(bits))
-
-	if len(bits) < 32 {
-		numberOfZeros := 32 - len(bits)
-		for i := 0; i < numberOfZeros; i++ {
-			bits = append([]int{0}, bits...)
-		}
-	}
-
-	return bits, nil
-}
-
 func roundUpToNearestMultipleOf512(n int) int {
 	return ((n + 512 - 1) / 512) * 512
 }
 
-func padding(bits []int, totalLength int) []int {
-
-	bits = append(bits, 1)
-
-	noOfZerosToPad := totalLength - len(bits) - 64
-	for i := 0; i < noOfZerosToPad; i++ {
-		bits = append(bits, 0)
-	}
-
-	return bits
-}
-
+// ? Convert an integer size to a 64-bit representation
 func to64Bit(size int) []int {
 	sizeBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(sizeBytes, uint64(size))
@@ -90,38 +38,7 @@ func to64Bit(size int) []int {
 	return bits
 }
 
-func rotr(x uint32, n uint) uint32 {
-	return (x >> n) | (x << (32 - n))
-}
-
-// !Sigma0 function --> 32 bit
-func sigma0(x uint32) uint32 {
-	return rotr(x, 7) ^ rotr(x, 18) ^ (x >> 3)
-}
-
-// ! Sigma1 function -- > 32 bit
-func sigma1(x uint32) uint32 {
-	return rotr(x, 17) ^ rotr(x, 19) ^ (x >> 10)
-}
-
-// ! summation0 function --> 32 bit
-func summation0(x uint32) uint32 {
-	return rotr(x, 2) ^ rotr(x, 13) ^ rotr(x, 22)
-}
-
-// ! summation1 function --> 32 bit
-func summation1(x uint32) uint32 {
-	return rotr(x, 6) ^ rotr(x, 11) ^ rotr(x, 25)
-}
-
-func ch(x, y, z uint32) uint32 {
-	return (x & y) ^ (^x & z)
-}
-
-func maj(x, y, z uint32) uint32 {
-	return (x & y) ^ (x & z) ^ (y & z)
-}
-
+// ? Convert bits to bytes
 func bitsToBytes(bits []int) []byte {
 	bytes := make([]byte, len(bits)/8)
 	for i := 0; i < len(bits); i += 8 {
@@ -132,7 +49,24 @@ func bitsToBytes(bits []int) []byte {
 	return bytes
 }
 
-// ! Divide the padded message into 512-bit blocks and split into 32-bit words
+//*		===============================
+//* 	  Padding and Block Handling
+//* 	==============================
+
+// ? Pad the bit array according to the SHA-256 specification
+func padding(bits []int, totalLength int) []int {
+
+	bits = append(bits, 1)
+
+	noOfZerosToPad := totalLength - len(bits) - 64
+	for i := 0; i < noOfZerosToPad; i++ {
+		bits = append(bits, 0)
+	}
+
+	return bits
+}
+
+// ? Divide the padded message into 512-bit blocks and split into 32-bit words
 func divideIntoBlocks(paddedMessage []int) [][]uint32 {
 	var blocks [][]uint32
 	bytes := bitsToBytes(paddedMessage)
@@ -150,13 +84,45 @@ func divideIntoBlocks(paddedMessage []int) [][]uint32 {
 	return blocks
 }
 
-func generateMessageSchedule(block []uint32) []uint32 {
-	W := make([]uint32, 64)
+//* 		==========================
+//* 			 SHA-256 Functions
+//* 		==========================
 
-	//? Copy first 16 words
+// ? SHA-256 auxiliary functions
+func rotr(x uint32, n uint) uint32 {
+	return (x >> n) | (x << (32 - n))
+}
+
+func sigma0(x uint32) uint32 {
+	return rotr(x, 7) ^ rotr(x, 18) ^ (x >> 3)
+}
+
+func sigma1(x uint32) uint32 {
+	return rotr(x, 17) ^ rotr(x, 19) ^ (x >> 10)
+}
+
+func summation0(x uint32) uint32 {
+	return rotr(x, 2) ^ rotr(x, 13) ^ rotr(x, 22)
+}
+
+func summation1(x uint32) uint32 {
+	return rotr(x, 6) ^ rotr(x, 11) ^ rotr(x, 25)
+}
+
+func ch(x, y, z uint32) uint32 {
+	return (x & y) ^ (^x & z)
+}
+
+func maj(x, y, z uint32) uint32 {
+	return (x & y) ^ (x & z) ^ (y & z)
+}
+
+// ? Generate the message schedule for the current block
+func generateMessageSchedule(block []uint32) []uint32 {
+
+	W := make([]uint32, 64)
 	copy(W[:16], block)
 
-	//? Calculate W16 to W63
 	for i := 16; i < 64; i++ {
 		s0 := sigma0(W[i-15])
 		s1 := sigma1(W[i-2])
@@ -165,8 +131,12 @@ func generateMessageSchedule(block []uint32) []uint32 {
 	return W
 }
 
+//* ==========================
+//* Main Function
+//* ==========================
+
 func main() {
-	x := []byte(" ")
+	x := []byte("")
 	bitsX := bits(x)
 	numberOfBits := len(bitsX)
 	nextMultipleOf512 := roundUpToNearestMultipleOf512(numberOfBits + 65)
@@ -174,61 +144,18 @@ func main() {
 	paddedBits := padding(bitsX, nextMultipleOf512)
 	last64Bits := to64Bit(numberOfBits)
 	mergedArray := append(paddedBits, last64Bits...)
-	fmt.Println("Merged Array:", mergedArray)
-	fmt.Println("Merged Array:", len(mergedArray))
 
 	blocks := divideIntoBlocks(mergedArray)
 
-	// for i, block := range blocks {
-	// 	fmt.Printf("Block %d:\n", i)
-	// 	for j, word := range block {
-	// 		bits, err := hexToBits(fmt.Sprintf("%x", word))
-	// 		if err != nil {
-	// 			fmt.Println("Error:", err)
-	// 			return
-	// 		}
-	// 		fmt.Printf("  Word %d: %v\n  ", j, bits)
-	// 	}
-	// }
-	for i, block := range blocks {
-		fmt.Printf("Block %d:\n", i)
-		for j, word := range block {
-			fmt.Printf("  Word %d: %032b\n", j, word)
-		}
-
-		// Generate W16 to W63 for this block
-		fmt.Println("######", block)
-		W := generateMessageSchedule(block)
-
-		fmt.Println("Message Schedule W16 to W63:")
-		for i := 16; i < 64; i++ {
-			fmt.Printf("  W[%d] = %032b\n", i, W[i])
-		}
+	for _, block := range blocks {
+		generateMessageSchedule(block)
 	}
 
-	// hexString := "6a09e667"
-
-	// bits, err := hexToBits(hexString)
-	// if err != nil {
-	// 	fmt.Println("Error:", err)
-	// 	return
-	// }
-
-	numberOfBlocks := len(mergedArray) / 512
-
-	fmt.Println("Number of Blocks:", numberOfBlocks)
-
+	//! SHA-256 constants
 	var HConstants = []uint32{
 		0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
 		0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 	}
-
-	// bits2, err := hexToBits(fmt.Sprintf("%x", HConstants[0]))
-
-	// if err != nil {
-	// 	fmt.Println("Error:", err)
-	// 	return
-	// }
 
 	var KConstants = []uint32{
 		0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
@@ -249,6 +176,7 @@ func main() {
 		0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 	}
 
+	// Process each block
 	for _, block := range blocks {
 		W := generateMessageSchedule(block)
 
@@ -267,6 +195,7 @@ func main() {
 			a = T1 + T2
 		}
 
+		// Update hash values
 		HConstants[0] += a
 		HConstants[1] += b
 		HConstants[2] += c
