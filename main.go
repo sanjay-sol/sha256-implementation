@@ -30,25 +30,25 @@ func bits(b []byte) []int {
 // 		}
 // 	}
 
-// 	return bits, nil
-// }
+//		return bits, nil
+//	}
 func hexToBits(hexString string) ([]int, error) {
-    if len(hexString)%2 != 0 {
+	if len(hexString)%2 != 0 {
 		// fmt.Println("True", len(hexString), hexString)
-        hexString = "0" + hexString
-    }
+		hexString = "0" + hexString
+	}
 
-    bytes, err := hex.DecodeString(hexString)
-    if err != nil {
-        return nil, err
-    }
+	bytes, err := hex.DecodeString(hexString)
+	if err != nil {
+		return nil, err
+	}
 
-    var bits []int
-    for _, b := range bytes {
-        for i := 7; i >= 0; i-- {
-            bits = append(bits, int((b>>i)&1))
-        }
-    }
+	var bits []int
+	for _, b := range bytes {
+		for i := 7; i >= 0; i-- {
+			bits = append(bits, int((b>>i)&1))
+		}
+	}
 	// fmt.Println("Bits:", bits, len(bits))
 
 	if len(bits) < 32 {
@@ -58,7 +58,7 @@ func hexToBits(hexString string) ([]int, error) {
 		}
 	}
 
-    return bits, nil
+	return bits, nil
 }
 
 func roundUpToNearestMultipleOf512(n int) int {
@@ -114,7 +114,7 @@ func bitsToBytes(bits []int) []byte {
 	return bytes
 }
 
-//! Divide the padded message into 512-bit blocks and split into 32-bit words
+// ! Divide the padded message into 512-bit blocks and split into 32-bit words
 func divideIntoBlocks(paddedMessage []int) [][]uint32 {
 	var blocks [][]uint32
 	bytes := bitsToBytes(paddedMessage)
@@ -132,6 +132,21 @@ func divideIntoBlocks(paddedMessage []int) [][]uint32 {
 	return blocks
 }
 
+func generateMessageSchedule(block []uint32) []uint32 {
+	W := make([]uint32, 64)
+
+	//? Copy first 16 words
+	copy(W[:16], block)
+
+	//? Calculate W16 to W63
+	for i := 16; i < 64; i++ {
+		s0 := sigma0(W[i-15])
+		s1 := sigma1(W[i-2])
+		W[i] = s1 + W[i-7] + s0 + W[i-16]
+	}
+	return W
+}
+
 func main() {
 	x := []byte("Hello saldifou oiasfoiasdhf kajsdhf asoiflhoo234 aslhd akjhsd alkhklf akwlh 'asl;l sdasd sdgees;dfs dfdsf")
 	bitsX := bits(x)
@@ -146,15 +161,29 @@ func main() {
 
 	blocks := divideIntoBlocks(mergedArray)
 
+	// for i, block := range blocks {
+	// 	fmt.Printf("Block %d:\n", i)
+	// 	for j, word := range block {
+	// 		bits, err := hexToBits(fmt.Sprintf("%x", word))
+	// 		if err != nil {
+	// 			fmt.Println("Error:", err)
+	// 			return
+	// 		}
+	// 		fmt.Printf("  Word %d: %v\n  ", j, bits)
+	// 	}
+	// }
 	for i, block := range blocks {
 		fmt.Printf("Block %d:\n", i)
 		for j, word := range block {
-			bits, err := hexToBits(fmt.Sprintf("%x", word))
-			if err != nil {
-				fmt.Println("Error:", err)
-				return
-			}
-			fmt.Printf("  Word %d: %v\n  ", j, bits)
+			fmt.Printf("  Word %d: %032b\n", j, word)
+		}
+
+		// Generate W16 to W63 for this block
+		W := generateMessageSchedule(block)
+
+		fmt.Println("Message Schedule W16 to W63:")
+		for i := 16; i < 64; i++ {
+			fmt.Printf("  W[%d] = %032b\n", i, W[i])
 		}
 	}
 
@@ -207,5 +236,8 @@ func main() {
 
 	fmt.Println("Bits:", bits)
 	fmt.Println("Bits2:", bits2)
+
+	xr := sigma1(uint32(3336150337))
+	fmt.Println("Sigma0:", xr)
 
 }
