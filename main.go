@@ -104,6 +104,24 @@ func sigma1(x uint32) uint32 {
 	return rotr(x, 17) ^ rotr(x, 19) ^ (x >> 10)
 }
 
+// ! summation0 function --> 32 bit
+func summation0(x uint32) uint32 {
+	return rotr(x, 2) ^ rotr(x, 13) ^ rotr(x, 22)
+}
+
+// ! summation1 function --> 32 bit
+func summation1(x uint32) uint32 {
+	return rotr(x, 6) ^ rotr(x, 11) ^ rotr(x, 25)
+}
+
+func ch(x, y, z uint32) uint32 {
+	return (x & y) ^ (^x & z)
+}
+
+func maj(x, y, z uint32) uint32 {
+	return (x & y) ^ (x & z) ^ (y & z)
+}
+
 func bitsToBytes(bits []int) []byte {
 	bytes := make([]byte, len(bits)/8)
 	for i := 0; i < len(bits); i += 8 {
@@ -148,7 +166,7 @@ func generateMessageSchedule(block []uint32) []uint32 {
 }
 
 func main() {
-	x := []byte("Hello saldifou oiasfoiasdhf kajsdhf asoiflhoo234 aslhd akjhsd alkhklf akwlh 'asl;l sdasd sdgees;dfs dfdsf")
+	x := []byte(" ")
 	bitsX := bits(x)
 	numberOfBits := len(bitsX)
 	nextMultipleOf512 := roundUpToNearestMultipleOf512(numberOfBits + 65)
@@ -179,6 +197,7 @@ func main() {
 		}
 
 		// Generate W16 to W63 for this block
+		fmt.Println("######", block)
 		W := generateMessageSchedule(block)
 
 		fmt.Println("Message Schedule W16 to W63:")
@@ -187,31 +206,31 @@ func main() {
 		}
 	}
 
-	hexString := "6a09e667"
+	// hexString := "6a09e667"
 
-	bits, err := hexToBits(hexString)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
+	// bits, err := hexToBits(hexString)
+	// if err != nil {
+	// 	fmt.Println("Error:", err)
+	// 	return
+	// }
 
 	numberOfBlocks := len(mergedArray) / 512
 
 	fmt.Println("Number of Blocks:", numberOfBlocks)
 
-	var HConstants = []int{
+	var HConstants = []uint32{
 		0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
 		0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
 	}
 
-	bits2, err := hexToBits(fmt.Sprintf("%x", HConstants[0]))
+	// bits2, err := hexToBits(fmt.Sprintf("%x", HConstants[0]))
 
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
+	// if err != nil {
+	// 	fmt.Println("Error:", err)
+	// 	return
+	// }
 
-	var KConstants = []int{
+	var KConstants = []uint32{
 		0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
 		0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
 		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -230,14 +249,34 @@ func main() {
 		0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 	}
 
-	fmt.Println("K Constants:", KConstants)
+	for _, block := range blocks {
+		W := generateMessageSchedule(block)
 
-	fmt.Println("H Constants:", HConstants)
+		a, b, c, d, e, f, g, h := HConstants[0], HConstants[1], HConstants[2], HConstants[3], HConstants[4], HConstants[5], HConstants[6], HConstants[7]
 
-	fmt.Println("Bits:", bits)
-	fmt.Println("Bits2:", bits2)
+		for i := 0; i < 64; i++ {
+			T1 := h + summation1(e) + ch(e, f, g) + KConstants[i] + W[i]
+			T2 := summation0(a) + maj(a, b, c)
+			h = g
+			g = f
+			f = e
+			e = d + T1
+			d = c
+			c = b
+			b = a
+			a = T1 + T2
+		}
 
-	xr := sigma1(uint32(3336150337))
-	fmt.Println("Sigma0:", xr)
+		HConstants[0] += a
+		HConstants[1] += b
+		HConstants[2] += c
+		HConstants[3] += d
+		HConstants[4] += e
+		HConstants[5] += f
+		HConstants[6] += g
+		HConstants[7] += h
+	}
+
+	fmt.Printf("Final hash: %08x%08x%08x%08x%08x%08x%08x%08x\n", HConstants[0], HConstants[1], HConstants[2], HConstants[3], HConstants[4], HConstants[5], HConstants[6], HConstants[7])
 
 }
